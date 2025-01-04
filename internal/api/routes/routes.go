@@ -33,5 +33,5 @@ func Setup(e *echo.Echo, cfg *config.Config) {
     protected.Use(middlewares.JWTMiddleware(authService))
 
     // Protected routes will be added here
-    protected.GET("/user/profile", handlers.GetProfile)
+    protected.GET("/user/profile", authHandler.GetProfile)
 }
