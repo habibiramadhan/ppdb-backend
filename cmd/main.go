@@ -4,6 +4,8 @@ import (
     "log"
     "ppdb-backend/config"
     "ppdb-backend/internal/api/routes"
+    "ppdb-backend/utils"
+    "os"
     
     "github.com/joho/godotenv"
     "github.com/labstack/echo/v4"
@@ -23,6 +25,9 @@ func main() {
     // Echo instance
     e := echo.New()
 
+    // Set custom validator
+    e.Validator = utils.NewValidator()
+
     // Middleware
     e.Use(middleware.Logger())
     e.Use(middleware.Recover())
@@ -32,5 +37,5 @@ func main() {
     routes.Setup(e, cfg)
 
     // Start server
-    e.Logger.Fatal(e.Start(":8080"))
+    e.Logger.Fatal(e.Start(":" + os.Getenv("APP_PORT")))
 }
