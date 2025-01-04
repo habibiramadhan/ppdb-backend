@@ -49,7 +49,12 @@ func (h *AuthHandler) Login(c echo.Context) error {
         })
     }
 
-    return c.JSON(http.StatusOK, map[string]string{
-        "token": token,
+    return c.JSON(http.StatusOK, map[string]interface{}{
+        "status": "success",
+        "data": map[string]string{
+            "access_token": token,
+            "token_type": "Bearer",
+        },
+        "message": "Login successful",
     })
 }
