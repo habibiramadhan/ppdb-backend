@@ -1,17 +1,36 @@
 package main
 
 import (
-	"net/http"
-
-	"github.com/labstack/echo/v4"
+    "log"
+    "ppdb-backend/config"
+    "ppdb-backend/internal/api/routes"
+    
+    "github.com/joho/godotenv"
+    "github.com/labstack/echo/v4"
+    "github.com/labstack/echo/v4/middleware"
 )
 
 func main() {
-	e := echo.New()
+    // Load .env file
+    err := godotenv.Load()
+    if err != nil {
+        log.Fatal("Error loading .env file")
+    }
 
-	e.GET("/", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Hello, Echo!")
-	})
+    // Initialize config
+    cfg := config.NewConfig()
 
-	e.Logger.Fatal(e.Start(":8080"))
+    // Echo instance
+    e := echo.New()
+
+    // Middleware
+    e.Use(middleware.Logger())
+    e.Use(middleware.Recover())
+    e.Use(middleware.CORS())
+
+    // Setup Routes
+    routes.Setup(e, cfg)
+
+    // Start server
+    e.Logger.Fatal(e.Start(":8080"))
 }
