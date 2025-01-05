@@ -22,7 +22,6 @@ type MajorService interface {
 	SetStatus(id uuid.UUID, isActive bool) error
 	UpdateIcon(id uuid.UUID, file *multipart.FileHeader) error
 	Search(keyword string, status *bool, page, limit int) ([]models.Major, *utils.PaginationMeta, error)
-	// Method untuk files
 	UploadFiles(majorID uuid.UUID, files []*multipart.FileHeader, fileType models.FileType) error
 	DeleteFile(fileID uuid.UUID) error
 	GetMajorFiles(majorID uuid.UUID) ([]models.MajorFile, error)
@@ -53,9 +52,7 @@ func NewMajorService(majorRepo repositories.MajorRepository, majorFileRepo repos
 	}
 }
 
-// Bikin jurusan baru
 func (s *majorService) Create(input CreateMajorInput) error {
-	// Cek kode jurusan udah ada belum
 	existing, _ := s.majorRepo.FindByCode(input.Code)
 	if existing != nil {
 		return errors.New("waduh kode jurusan udah dipake nih")
@@ -71,7 +68,6 @@ func (s *majorService) Create(input CreateMajorInput) error {
 	return s.majorRepo.Create(major)
 }
 
-// Ambil semua jurusan dengan pagination
 func (s *majorService) GetAll(page, limit int) ([]models.Major, *utils.PaginationMeta, error) {
 	offset := (page - 1) * limit
 
@@ -91,7 +87,6 @@ func (s *majorService) GetAll(page, limit int) ([]models.Major, *utils.Paginatio
 	return majors, pagination, nil
 }
 
-// Ambil detail jurusan by ID
 func (s *majorService) GetByID(id uuid.UUID) (*models.Major, error) {
 	major, err := s.majorRepo.FindByID(id)
 	if err != nil {
@@ -100,14 +95,12 @@ func (s *majorService) GetByID(id uuid.UUID) (*models.Major, error) {
 	return major, nil
 }
 
-// Update data jurusan
 func (s *majorService) Update(id uuid.UUID, input UpdateMajorInput) error {
 	major, err := s.majorRepo.FindByID(id)
 	if err != nil {
 		return errors.New("jurusan ga ketemu nih")
 	}
 
-	// Kalo ganti kode, cek duplikat
 	if major.Code != input.Code {
 		existing, _ := s.majorRepo.FindByCode(input.Code)
 		if existing != nil {
@@ -122,7 +115,6 @@ func (s *majorService) Update(id uuid.UUID, input UpdateMajorInput) error {
 	return s.majorRepo.Update(major)
 }
 
-// Hapus jurusan
 func (s *majorService) Delete(id uuid.UUID) error {
 	major, err := s.majorRepo.FindByID(id)
 	if err != nil {
@@ -133,18 +125,16 @@ func (s *majorService) Delete(id uuid.UUID) error {
 		return errors.New("ga bisa hapus jurusan yang masih aktif, non-aktifin dulu ya")
 	}
 
-	// Hapus semua file terkait
 	files, err := s.majorFileRepo.FindByMajorID(id)
 	if err == nil {
 		for _, file := range files {
-			_ = utils.DeleteFile(file.FilePath) // Hapus file fisik
+			_ = utils.DeleteFile(file.FilePath)
 		}
 	}
 
 	return s.majorRepo.Delete(id)
 }
 
-// Update status aktif/non-aktif
 func (s *majorService) SetStatus(id uuid.UUID, isActive bool) error {
 	_, err := s.majorRepo.FindByID(id)
 	if err != nil {
@@ -154,15 +144,12 @@ func (s *majorService) SetStatus(id uuid.UUID, isActive bool) error {
 	return s.majorRepo.SetStatus(id, isActive)
 }
 
-// Upload/update icon jurusan
 func (s *majorService) UpdateIcon(id uuid.UUID, file *multipart.FileHeader) error {
-	// Cek jurusan exists
 	major, err := s.majorRepo.FindByID(id)
 	if err != nil {
 		return errors.New("jurusan ga ketemu nih")
 	}
 
-	// Validasi file
 	if err := utils.ValidateFileSize(file.Size); err != nil {
 		return err
 	}
@@ -175,7 +162,6 @@ func (s *majorService) UpdateIcon(id uuid.UUID, file *multipart.FileHeader) erro
 		return err
 	}
 
-	// Generate nama file yang aman
 	filename := fmt.Sprintf("%s_%s%s",
 		major.Code,
 		uuid.New().String(),
@@ -183,24 +169,19 @@ func (s *majorService) UpdateIcon(id uuid.UUID, file *multipart.FileHeader) erro
 	)
 	filename = utils.CleanFileName(filename)
 
-	// Set path file
 	path := filepath.Join(utils.UploadDir, "majors/icons", filename)
 
-	// Hapus icon lama kalo ada
 	if major.IconURL != "" {
 		_ = utils.DeleteFile(major.IconURL)
 	}
 
-	// Upload file baru
 	if err := utils.SaveUploadedFile(file, path); err != nil {
 		return fmt.Errorf("gagal upload file: %v", err)
 	}
 
-	// Update database
 	return s.majorRepo.UpdateIcon(id, path)
 }
 
-// Search jurusan dengan filter
 func (s *majorService) Search(keyword string, status *bool, page, limit int) ([]models.Major, *utils.PaginationMeta, error) {
 	offset := (page - 1) * limit
 
@@ -220,20 +201,16 @@ func (s *majorService) Search(keyword string, status *bool, page, limit int) ([]
 	return majors, pagination, nil
 }
 
-// Upload file pendukung jurusan
 func (s *majorService) UploadFiles(majorID uuid.UUID, files []*multipart.FileHeader, fileType models.FileType) error {
-	// Validasi jurusan exists
 	if _, err := s.majorRepo.FindByID(majorID); err != nil {
 		return errors.New("jurusan ga ketemu nih")
 	}
 
-	// Validasi tipe file
 	if !models.IsValidFileType(string(fileType)) {
 		return errors.New("tipe file ga valid")
 	}
 
 	for _, file := range files {
-		// Validasi tiap file
 		if err := utils.ValidateFileSize(file.Size); err != nil {
 			return fmt.Errorf("file %s: %v", file.Filename, err)
 		}
@@ -246,7 +223,6 @@ func (s *majorService) UploadFiles(majorID uuid.UUID, files []*multipart.FileHea
 			return fmt.Errorf("file %s: %v", file.Filename, err)
 		}
 
-		// Generate nama file yang aman
 		filename := fmt.Sprintf("%s_%s_%s%s",
 			fileType,
 			uuid.New().String(),
@@ -254,15 +230,12 @@ func (s *majorService) UploadFiles(majorID uuid.UUID, files []*multipart.FileHea
 			filepath.Ext(file.Filename),
 		)
 
-		// Set path file
 		path := filepath.Join(utils.UploadDir, "majors/files", filename)
 
-		// Upload file
 		if err := utils.SaveUploadedFile(file, path); err != nil {
 			return fmt.Errorf("gagal upload file %s: %v", file.Filename, err)
 		}
 
-		// Simpan ke database
 		majorFile := &models.MajorFile{
 			MajorID:  majorID,
 			Title:    file.Filename,
@@ -273,7 +246,6 @@ func (s *majorService) UploadFiles(majorID uuid.UUID, files []*multipart.FileHea
 		}
 
 		if err := s.majorFileRepo.Create(majorFile); err != nil {
-			// Hapus file yang udah terupload kalo gagal
 			_ = utils.DeleteFile(path)
 			return fmt.Errorf("gagal simpan data file %s: %v", file.Filename, err)
 		}
@@ -282,25 +254,20 @@ func (s *majorService) UploadFiles(majorID uuid.UUID, files []*multipart.FileHea
 	return nil
 }
 
-// Hapus file pendukung
 func (s *majorService) DeleteFile(fileID uuid.UUID) error {
 	file, err := s.majorFileRepo.FindByID(fileID)
 	if err != nil {
 		return errors.New("file ga ketemu nih")
 	}
 
-	// Hapus file fisik
 	if err := utils.DeleteFile(file.FilePath); err != nil {
 		return fmt.Errorf("gagal hapus file: %v", err)
 	}
 
-	// Hapus dari database
 	return s.majorFileRepo.Delete(fileID)
 }
 
-// Ambil semua file jurusan
 func (s *majorService) GetMajorFiles(majorID uuid.UUID) ([]models.MajorFile, error) {
-	// Validasi jurusan exists
 	if _, err := s.majorRepo.FindByID(majorID); err != nil {
 		return nil, errors.New("jurusan ga ketemu nih")
 	}

@@ -16,7 +16,6 @@ type MajorRepository interface {
     Delete(id uuid.UUID) error
     SetStatus(id uuid.UUID, isActive bool) error
     UpdateIcon(id uuid.UUID, iconURL string) error
-    // Method tambahan buat search & filter
     SearchMajors(keyword string, status *bool, limit, offset int) ([]models.Major, int64, error)
 }
 
@@ -36,12 +35,10 @@ func (r *majorRepository) FindAll(limit, offset int) ([]models.Major, int64, err
     var majors []models.Major
     var total int64
 
-    // Hitung total data
     if err := r.db.Model(&models.Major{}).Count(&total).Error; err != nil {
         return nil, 0, err
     }
 
-    // Ambil data dengan pagination
     if err := r.db.Preload("Files").
         Limit(limit).
         Offset(offset).
@@ -78,14 +75,11 @@ func (r *majorRepository) Update(major *models.Major) error {
 }
 
 func (r *majorRepository) Delete(id uuid.UUID) error {
-    // Gunakan transaction untuk hapus major dan files
     return r.db.Transaction(func(tx *gorm.DB) error {
-        // Hapus files dulu
         if err := tx.Where("major_id = ?", id).Delete(&models.MajorFile{}).Error; err != nil {
             return err
         }
         
-        // Hapus major
         if err := tx.Delete(&models.Major{}, id).Error; err != nil {
             return err
         }
@@ -112,23 +106,19 @@ func (r *majorRepository) SearchMajors(keyword string, status *bool, limit, offs
     
     query := r.db.Model(&models.Major{})
 
-    // Filter by keyword
     if keyword != "" {
         query = query.Where("name ILIKE ? OR code ILIKE ? OR description ILIKE ?", 
             "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
     }
 
-    // Filter by status
     if status != nil {
         query = query.Where("is_active = ?", *status)
     }
 
-    // Count total
     if err := query.Count(&total).Error; err != nil {
         return nil, 0, err
     }
 
-    // Get data with pagination
     if err := query.Preload("Files").
         Limit(limit).
         Offset(offset).
