@@ -20,6 +20,10 @@ func main() {
         log.Fatal("Error loading .env file")
     }
 
+    if err := utils.SetupUploadDir(); err != nil {
+        log.Fatal("Gagal setup folder upload:", err)
+    }
+    
     // Initialize config
     cfg := config.NewConfig()
 
@@ -34,6 +38,7 @@ func main() {
     e.Use(middleware.Recover())
     e.Use(middleware.CORS())
 
+    
     // Setup Routes
     routes.Setup(e, cfg)
 
