@@ -18,9 +18,11 @@ func Setup(e *echo.Echo, cfg *config.Config) {
 
 	// Initialize services
 	authService := services.NewAuthService(userRepo, os.Getenv("JWT_SECRET"))
+	adminService := services.NewAdminService(userRepo)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
+	adminHandler := handlers.NewAdminHandler(adminService)
 
 	// Public routes group
 	public := e.Group("/api/v1")
@@ -33,6 +35,17 @@ func Setup(e *echo.Echo, cfg *config.Config) {
 	protected := e.Group("/api/v1")
 	protected.Use(middlewares.JWTMiddleware(authService))
 
-	// Protected routes will be added here
+	// Protected routes
 	protected.GET("/user/profile", authHandler.GetProfile)
+
+	// Admin routes group
+	admin := protected.Group("/admin")
+	admin.Use(middlewares.AdminMiddleware())
+
+	// Admin routes
+	admin.GET("/users", adminHandler.GetAllUsers)
+	admin.GET("/users/:id", adminHandler.GetUserByID)
+	admin.PUT("/users/:id", adminHandler.UpdateUser)
+	admin.DELETE("/users/:id", adminHandler.DeleteUser)
+	admin.PATCH("/users/:id/status", adminHandler.UpdateUserStatus)
 }
