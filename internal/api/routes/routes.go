@@ -2,6 +2,7 @@
 package routes
 
 import (
+	"log"
 	"os"
 	"ppdb-backend/config"
 	"ppdb-backend/internal/api/handlers"
@@ -15,14 +16,23 @@ import (
 func Setup(e *echo.Echo, cfg *config.Config) {
 	// Initialize repositories
 	userRepo := repositories.NewUserRepository(cfg.DB)
+	verificationRepo := repositories.NewVerificationRepository(cfg.DB)
+
+	// Initialize email service
+	emailService, err := services.NewEmailService()
+	if err != nil {
+		log.Fatal("Failed to initialize email service:", err)
+	}
 
 	// Initialize services
 	authService := services.NewAuthService(userRepo, os.Getenv("JWT_SECRET"))
 	adminService := services.NewAdminService(userRepo)
+	verificationService := services.NewVerificationService(verificationRepo, userRepo, emailService)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	adminHandler := handlers.NewAdminHandler(adminService)
+	verificationHandler := handlers.NewVerificationHandler(verificationService)
 
 	// Public routes group
 	public := e.Group("/api/v1")
@@ -31,6 +41,9 @@ func Setup(e *echo.Echo, cfg *config.Config) {
 	public.POST("/auth/register", authHandler.Register)
 	public.POST("/auth/login", authHandler.Login)
 
+	// Verification routes
+	public.GET("/verify-email", verificationHandler.VerifyEmail)
+	public.POST("/resend-verification", verificationHandler.ResendVerification)
 	// Protected routes group
 	protected := e.Group("/api/v1")
 	protected.Use(middlewares.JWTMiddleware(authService))
