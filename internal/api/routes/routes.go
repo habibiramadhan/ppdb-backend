@@ -21,6 +21,7 @@ func Setup(e *echo.Echo, cfg *config.Config) {
 	academicYearRepo := repositories.NewAcademicYearRepository(cfg.DB)
 	majorRepo := repositories.NewMajorRepository(cfg.DB)
 	majorFileRepo := repositories.NewMajorFileRepository(cfg.DB)
+	quotaRepo := repositories.NewMajorQuotaRepository(cfg.DB)
 
 	// Setup email service
 	emailService, err := services.NewEmailService()
@@ -48,7 +49,7 @@ func Setup(e *echo.Echo, cfg *config.Config) {
 	)
 	academicYearService := services.NewAcademicYearService(academicYearRepo)
 	majorService := services.NewMajorService(majorRepo, majorFileRepo)
-
+	quotaService := services.NewMajorQuotaService(quotaRepo, academicYearRepo, majorRepo)
 
 	// Inisialisasi handlers
 	authHandler := handlers.NewAuthHandler(authService)
@@ -57,6 +58,7 @@ func Setup(e *echo.Echo, cfg *config.Config) {
 	passwordResetHandler := handlers.NewPasswordResetHandler(passwordResetService)
 	academicYearHandler := handlers.NewAcademicYearHandler(academicYearService)
 	majorHandler := handlers.NewMajorHandler(majorService)
+	quotaHandler := handlers.NewMajorQuotaHandler(quotaService)
 
 	// Setup session
 	sessionRepo := repositories.NewSessionRepository(cfg.DB)
@@ -113,6 +115,12 @@ func Setup(e *echo.Echo, cfg *config.Config) {
 	admin.POST("/majors/:id/files", majorHandler.UploadFiles)
 	admin.DELETE("/majors/files/:id", majorHandler.DeleteFile)
 
+	// Route manajemen kuota jurusan
+	admin.POST("/major-quotas", quotaHandler.Create)
+	admin.PUT("/major-quotas/:id", quotaHandler.Update)
+	admin.DELETE("/major-quotas/:id", quotaHandler.Delete)
+	admin.GET("/major-quotas/:id/logs", quotaHandler.GetLogs)
+
 	// Route manajemen sesi
 	protected.GET("/sessions", sessionHandler.GetActiveSessions)
 	protected.DELETE("/sessions/:id", sessionHandler.RevokeSession)
@@ -125,4 +133,6 @@ func Setup(e *echo.Echo, cfg *config.Config) {
 	public.GET("/majors/:id", majorHandler.GetByID) 
 	public.GET("/majors/:id/files", majorHandler.GetFiles)
 
+	public.GET("/major-quotas", quotaHandler.GetAll)
+	public.GET("/major-quotas/:id", quotaHandler.GetByID)
 }
