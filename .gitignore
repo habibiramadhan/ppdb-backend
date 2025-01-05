@@ -32,4 +32,9 @@ temp/
 *.log
 
 # Air live reload
-tmp/ 
+tmp/
+
+# Public files
+public/static/*
+public/uploads/majors/*
+public/uploads/majors/files/*
