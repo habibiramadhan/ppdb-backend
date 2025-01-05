@@ -46,6 +46,7 @@ func NewEmailService() (EmailService, error) {
 	templateFiles := []string{
 		"verification.html",
 		"welcome.html",
+		"password_reset.html",
 	}
 
 	for _, file := range templateFiles {
