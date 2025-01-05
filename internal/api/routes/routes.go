@@ -17,6 +17,7 @@ func Setup(e *echo.Echo, cfg *config.Config) {
 	userRepo := repositories.NewUserRepository(cfg.DB)
 	verificationRepo := repositories.NewVerificationRepository(cfg.DB)
 	passwordResetRepo := repositories.NewPasswordResetRepository(cfg.DB)
+	academicYearRepo := repositories.NewAcademicYearRepository(cfg.DB)
 
 	emailService, err := services.NewEmailService()
 	if err != nil {
@@ -40,11 +41,13 @@ func Setup(e *echo.Echo, cfg *config.Config) {
 		userRepo,
 		emailService,
 	)
+	academicYearService := services.NewAcademicYearService(academicYearRepo)
 
 	authHandler := handlers.NewAuthHandler(authService)
 	adminHandler := handlers.NewAdminHandler(adminService)
 	verificationHandler := handlers.NewVerificationHandler(verificationService)
 	passwordResetHandler := handlers.NewPasswordResetHandler(passwordResetService)
+	academicYearHandler := handlers.NewAcademicYearHandler(academicYearService)
 
 	sessionRepo := repositories.NewSessionRepository(cfg.DB)
 	sessionService := services.NewSessionService(sessionRepo, userRepo)
@@ -76,8 +79,20 @@ func Setup(e *echo.Echo, cfg *config.Config) {
 	admin.DELETE("/users/:id", adminHandler.DeleteUser)
 	admin.PATCH("/users/:id/status", adminHandler.UpdateUserStatus)
 
+	admin.POST("/academic-years", academicYearHandler.Create)
+	admin.GET("/academic-years", academicYearHandler.GetAll) 
+	admin.GET("/academic-years/:id", academicYearHandler.GetByID)
+	admin.PUT("/academic-years/:id", academicYearHandler.Update)
+	admin.DELETE("/academic-years/:id", academicYearHandler.Delete)
+	admin.PATCH("/academic-years/:id/status", academicYearHandler.SetStatus)
+
+	
+
 	protected.GET("/sessions", sessionHandler.GetActiveSessions)
 	protected.DELETE("/sessions/:id", sessionHandler.RevokeSession)
 	protected.DELETE("/sessions", sessionHandler.RevokeAllSessions)
+
+	// Route publik
+	public.GET("/academic-years/active", academicYearHandler.GetActive)
 
 }
