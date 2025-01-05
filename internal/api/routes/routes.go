@@ -1,7 +1,9 @@
 // internal/api/routes/routes.go
+// file untuk setup routing aplikasi
 package routes
 
 import (
+	"log"
 	"os"
 	"ppdb-backend/config"
 	"ppdb-backend/internal/api/handlers"
@@ -13,36 +15,54 @@ import (
 )
 
 func Setup(e *echo.Echo, cfg *config.Config) {
-	// Initialize repositories
 	userRepo := repositories.NewUserRepository(cfg.DB)
+	verificationRepo := repositories.NewVerificationRepository(cfg.DB)
 
-	// Initialize services
-	authService := services.NewAuthService(userRepo, os.Getenv("JWT_SECRET"))
+	emailService, err := services.NewEmailService()
+	if err != nil {
+		log.Fatal("Waduh gagal inisialisasi service email nih:", err)
+	}
+
+	authService := services.NewAuthService(
+		userRepo,
+		verificationRepo,
+		emailService,
+		os.Getenv("JWT_SECRET"),
+	)
 	adminService := services.NewAdminService(userRepo)
-
-	// Initialize handlers
+	verificationService := services.NewVerificationService(
+		verificationRepo,
+		userRepo,
+		emailService,
+	)
+    
 	authHandler := handlers.NewAuthHandler(authService)
 	adminHandler := handlers.NewAdminHandler(adminService)
+	verificationHandler := handlers.NewVerificationHandler(verificationService)
 
-	// Public routes group
+	// Grup route yang bisa diakses publik
 	public := e.Group("/api/v1")
 
-	// Auth routes
+	// Route buat autentikasi
 	public.POST("/auth/register", authHandler.Register)
 	public.POST("/auth/login", authHandler.Login)
 
-	// Protected routes group
+	// Route buat verifikasi
+	public.GET("/verify-email", verificationHandler.VerifyEmail)
+	public.POST("/resend-verification", verificationHandler.ResendVerification)
+
+	// Grup route yang perlu login dulu
 	protected := e.Group("/api/v1")
 	protected.Use(middlewares.JWTMiddleware(authService))
 
-	// Protected routes
+	// Route yang butuh login
 	protected.GET("/user/profile", authHandler.GetProfile)
 
-	// Admin routes group
+	// Grup route khusus admin
 	admin := protected.Group("/admin")
 	admin.Use(middlewares.AdminMiddleware())
 
-	// Admin routes
+	// Route buat admin
 	admin.GET("/users", adminHandler.GetAllUsers)
 	admin.GET("/users/:id", adminHandler.GetUserByID)
 	admin.PUT("/users/:id", adminHandler.UpdateUser)

@@ -1,7 +1,8 @@
 //internal/core/services/auth_service.go
 package services
-
 import (
+    "crypto/rand"
+    "encoding/hex"
     "errors"
     "ppdb-backend/internal/models"
     "ppdb-backend/internal/core/repositories"
@@ -18,8 +19,10 @@ type AuthService interface {
 }
 
 type authService struct {
-    userRepository repositories.UserRepository
-    jwtSecret     string
+    userRepo         repositories.UserRepository
+    verificationRepo repositories.VerificationRepository
+    emailService    EmailService
+    jwtSecret       string
 }
 
 type RegisterInput struct {
@@ -34,21 +37,34 @@ type LoginInput struct {
     Password string `json:"password" validate:"required"`
 }
 
-func NewAuthService(userRepo repositories.UserRepository, jwtSecret string) AuthService {
+func NewAuthService(
+    userRepo repositories.UserRepository,
+    verificationRepo repositories.VerificationRepository,
+    emailService EmailService,
+    jwtSecret string,
+) AuthService {
     return &authService{
-        userRepository: userRepo,
-        jwtSecret:     jwtSecret,
+        userRepo:         userRepo,
+        verificationRepo: verificationRepo,
+        emailService:     emailService,
+        jwtSecret:        jwtSecret,
     }
 }
 
+func generateToken() (string, error) {
+    b := make([]byte, 32)
+    if _, err := rand.Read(b); err != nil {
+        return "", err
+    }
+    return hex.EncodeToString(b), nil
+}
+
 func (s *authService) Register(input RegisterInput) error {
-    // Check if email already exists
-    existingUser, _ := s.userRepository.FindByEmail(input.Email)
+    existingUser, _ := s.userRepo.FindByEmail(input.Email)
     if existingUser != nil {
         return errors.New("email already registered")
     }
 
-    // Hash password
     hashedPassword, err := utils.HashPassword(input.Password)
     if err != nil {
         return err
@@ -59,23 +75,50 @@ func (s *authService) Register(input RegisterInput) error {
         Email:    input.Email,
         Password: hashedPassword,
         Role:     input.Role,
-        Status:   "active",
+        Status:   "inactive",
     }
 
-    return s.userRepository.Create(user)
+    if err := s.userRepo.Create(user); err != nil {
+        return err
+    }
+
+    token, err := generateToken()
+    if err != nil {
+        return err
+    }
+
+    verification := &models.EmailVerification{
+        UserID:    user.ID,
+        Token:     token,
+        SentAt:    time.Now(),
+        ExpiresAt: time.Now().Add(24 * time.Hour),
+    }
+
+    if err := s.verificationRepo.Create(verification); err != nil {
+        return err
+    }
+
+    if err := s.emailService.SendVerificationEmail(user.Email, token, user.Name); err != nil {
+        return err
+    }
+
+    return nil
 }
 
 func (s *authService) Login(input LoginInput) (string, error) {
-    user, err := s.userRepository.FindByEmail(input.Email)
+    user, err := s.userRepo.FindByEmail(input.Email)
     if err != nil {
         return "", errors.New("invalid email or password")
+    }
+
+    if user.Status != "active" {
+        return "", errors.New("please verify your email first")
     }
 
     if !utils.CheckPasswordHash(input.Password, user.Password) {
         return "", errors.New("invalid email or password")
     }
 
-    // Generate JWT Token
     token := jwt.New(jwt.SigningMethodHS256)
     claims := token.Claims.(jwt.MapClaims)
     claims["user_id"] = user.ID
