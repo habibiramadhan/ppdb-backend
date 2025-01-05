@@ -22,6 +22,8 @@ func Setup(e *echo.Echo, cfg *config.Config) {
 	majorRepo := repositories.NewMajorRepository(cfg.DB)
 	majorFileRepo := repositories.NewMajorFileRepository(cfg.DB)
 	quotaRepo := repositories.NewMajorQuotaRepository(cfg.DB)
+	scheduleRepo := repositories.NewScheduleRepository(cfg.DB)
+	notificationRepo := repositories.NewScheduleNotificationRepository(cfg.DB)
 
 	// Setup email service
 	emailService, err := services.NewEmailService()
@@ -50,6 +52,7 @@ func Setup(e *echo.Echo, cfg *config.Config) {
 	academicYearService := services.NewAcademicYearService(academicYearRepo)
 	majorService := services.NewMajorService(majorRepo, majorFileRepo)
 	quotaService := services.NewMajorQuotaService(quotaRepo, academicYearRepo, majorRepo)
+	scheduleService := services.NewScheduleService(scheduleRepo, notificationRepo, academicYearRepo, emailService)
 
 	// Inisialisasi handlers
 	authHandler := handlers.NewAuthHandler(authService)
@@ -59,6 +62,7 @@ func Setup(e *echo.Echo, cfg *config.Config) {
 	academicYearHandler := handlers.NewAcademicYearHandler(academicYearService)
 	majorHandler := handlers.NewMajorHandler(majorService)
 	quotaHandler := handlers.NewMajorQuotaHandler(quotaService)
+	scheduleHandler := handlers.NewScheduleHandler(scheduleService)
 
 	// Setup session
 	sessionRepo := repositories.NewSessionRepository(cfg.DB)
@@ -121,6 +125,12 @@ func Setup(e *echo.Echo, cfg *config.Config) {
 	admin.DELETE("/major-quotas/:id", quotaHandler.Delete)
 	admin.GET("/major-quotas/:id/logs", quotaHandler.GetLogs)
 
+	// Route manajemen jadwal
+	admin.POST("/schedules", scheduleHandler.Create)
+	admin.PUT("/schedules/:id", scheduleHandler.Update)
+	admin.DELETE("/schedules/:id", scheduleHandler.Delete)
+	admin.PATCH("/schedules/:id/status", scheduleHandler.SetStatus)
+
 	// Route manajemen sesi
 	protected.GET("/sessions", sessionHandler.GetActiveSessions)
 	protected.DELETE("/sessions/:id", sessionHandler.RevokeSession)
@@ -135,4 +145,9 @@ func Setup(e *echo.Echo, cfg *config.Config) {
 
 	public.GET("/major-quotas", quotaHandler.GetAll)
 	public.GET("/major-quotas/:id", quotaHandler.GetByID)
+
+	public.GET("/schedules", scheduleHandler.GetAll)
+	public.GET("/schedules/upcoming", scheduleHandler.GetUpcoming)
+	public.GET("/schedules/academic-year/:yearId", scheduleHandler.GetByAcademicYear)
+	public.GET("/schedules/:id", scheduleHandler.GetByID)
 }
