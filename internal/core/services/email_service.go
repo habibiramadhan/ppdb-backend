@@ -34,7 +34,6 @@ type EmailData struct {
 }
 
 func NewEmailService() (EmailService, error) {
-	// Setup SMTP dialer
 	dialer := gomail.NewDialer(
 		os.Getenv("SMTP_HOST"),
 		587,
@@ -42,14 +41,11 @@ func NewEmailService() (EmailService, error) {
 		os.Getenv("SMTP_PASSWORD"),
 	)
 
-	// Load email templates
 	templates := make(map[string]*template.Template)
 	templatesDir := "templates/emails"
 	templateFiles := []string{
 		"verification.html",
 		"welcome.html",
-		"password_reset.html",
-		"registration_confirmation.html",
 	}
 
 	for _, file := range templateFiles {
@@ -73,7 +69,6 @@ func (s *emailService) sendEmail(to string, subject string, templateName string,
 		return fmt.Errorf("template %s not found", templateName)
 	}
 
-	// Execute template with data
 	if err := tmpl.Execute(&body, data); err != nil {
 		return fmt.Errorf("failed to execute template: %v", err)
 	}
